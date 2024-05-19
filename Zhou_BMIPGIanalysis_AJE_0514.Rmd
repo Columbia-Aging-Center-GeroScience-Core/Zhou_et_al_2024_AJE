@@ -1,0 +1,1976 @@
+---
+title: "Zhou_BMIPGI_AJE_0514"
+author: "Jiayi Zhou"
+date: "05/14/2024"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+    toc_depth: 4
+    code_folding: hide
+---
+```{r, include=FALSE}
+library(data.table)
+library(tidyverse)
+library(R.utils)
+library(dplyr)
+library(gmodels)
+library(corrplot)
+library(RColorBrewer)
+library(umx)
+library(ggplot2)
+library(tidyr)
+library(RColorBrewer)
+library(viridis)
+library(gee)
+library(geepack)
+library(broom)
+library(haven)
+library(ggpubr)
+library(flextable)
+library(gtsummary)
+library(epiR)
+library(plm)
+library(fixest)
+library(readxl)
+library(bife)
+library(survival)
+library(scales)
+library(simex)
+```
+
+This document contains PGI main effect, rGE, and GxE analysis for Zhou et al. 2024
+*Data sources*
+Baseline interview and clinical lab data for DHWFS participants.        
+BMI PGI data computed for 950 individuals in DHWFS with genetic data.       
+
+*Sample restrictions*
+There are three sub-types of individuals in this study: famine exposed, time controls of famine exposed, sibling controls of famine exposed        
+
+* For primary analysis, only individuals with genetic data were included (n=950)        
+
+* For exposed vs. Time Control analysis, only famine exposed (n=485) and their time controls (n=161) were include.    
+* For sibling difference analysis, only famine-discordant sibling pairs were included (n = 452, 226 sibling pairs)
+
+* For sex-stratified analysis, participants were stratified with sex at birth. 
+
+* We further assess the the BMI and BMI correlation among famine-exposed only, time controls only, sibling controls only, and all controls.
+
+*Content*
+* Baseline cohort characteristics:        
+- Table 1. Sample Characteristics       
+- Table S1. Full Cohort vs. Analysis Sample Characteristics       
+- Table S3. LDpred2 Polygenic Index (PGI) Summary Statistics        
+- Table S12. PRSice2 PGI Summary Statistics       
+    
+* Main famine effect:       
+- Table S4/S6/S13/S15.panel A: main effects of famine exposure and genetic risk on BMI (BMI).
+- Table S5/S7/S14/S16.panel A: main effects of famine exposure and genetic risk on BMI adjusted by preconceptual exposure groups (D-1 and D0)        
+- Figure 3 Panel A: main effects of famine exposure on BMI        
+
+* Main PGI effect:        
+- Table S4/S5/S13/S15 Panel A second half: Main PGI effect and genetic association with BMI               
+- Table S5/S7/S14/S16.panel A.second half: Main PRS effect and genetic association with BMI adjusted by preconceptual exposure groups (D-1 and D0)        
+- Figure 3 Panel B: Main PRS effect       
+- Figure 4: Correlations between BMI and BMI PRS
+
+* Gene-environment correlation:               
+- Figure 3 Panel C: PRS distribution by Exposure Category       
+- Table S4/S6/S13/S15 Panel B: rGE        
+- Table S5/S7/S14/S16.Panel B: rGE adjusted by preconceptual exposure groups (D-1 and D0)         
+
+* Gene-environment interaction:        
+- Table S4/S6/S13/S15 Panel C: GxE        
+- Table S5/S7/S14/S16.Panel C: GxE adjusted by preconceptual exposure groups (D-1 and D0)         
+
+* Specific famine exposure timing analysis:       
+- Table S8: Sensitivity analysis on the timing-specific gene-environment correlation between in-utero famine exposure and LDpred2 produced BMI       
+- Figure S1: Sensitivity analysis on the timing-specific gene-environment correlation between in-utero famine exposure and LDpred2 produced BMI PGI.        
+- Table S17: Sensitivity analysis on the timing-specific gene-environment correlation between in-utero famine exposure and PRSice2 produced BMI       
+- Figure S3: Sensitivity analysis on the timing-specific gene-environment correlation between in-utero famine exposure and PRSice2 produced BMI PGI.        
+- Table S9. Sensitivity analysis on the timing-specific gene-environment interaction between in-utero famine exposure and LDpred2 produced BMI PGI.        
+- Figure S2: Sensitivity analysis on the timing-specific gene-environment interaction between in-utero famine exposure and LDpred2 produced BMI PGI.        
+- Table S18. Sensitivity analysis on the timing-specific gene-environment interaction between in-utero famine exposure and PRSice2 produced BMI PGI.        
+- Figure S4: Sensitivity analysis on the timing-specific gene-environment interaction between in-utero famine exposure and PRSice2 produced BMI PGI.        
+
+
+## Baseline
+
+#### Table 1: analysis sampel baseline characteristics
+```{r}
+Table1 = DHWFS_merged_data_prs %>%
+  select(type, 
+         male, agelab,bmi) %>%
+  tbl_strata(
+    strata = type,
+    .tbl_fun =
+      ~ .x %>%
+    tbl_summary(statistic = list(all_continuous() ~ "{mean} ({sd})"), missing = "no", label = list(agelab~"Age",male ~ "Male", bmi ~ "BMI")) %>%
+        add_n(),
+    .header = "**{strata}**, N = {n}"
+  )%>% as_gt() %>%
+              gt::tab_style(
+                style = gt::cell_text(weight = "bold"),
+                locations = gt::cells_row_groups(groups = everything())
+              ) %>%
+              gt::tab_header(title = "N = 950 Genetic Sample Cohort")
+
+Table1
+```
+
+
+#### Table S1: Sample characteristics
+```{r}
+S1_1 = DHWFS_merged_data %>%
+  select(type, 
+         male, agelab, DIABETES_c,bmi) %>%
+      tbl_summary(statistic = list(all_continuous() ~ "{mean} ({sd})"), missing = "no", label = list(type ~ "Exposure Category",DIABETES_c ~ "Type II Diabetes Cases",agelab~"Age",male ~ "Male", bmi ~ "BMI")) %>%
+        add_n() %>% as_gt() %>%
+              gt::tab_style(
+                style = gt::cell_text(weight = "bold"),
+                locations = gt::cells_row_groups(groups = everything())
+              ) %>%
+              gt::tab_header(title = "N=1031 Full Cohort")
+
+S1_2 = DHWFS_merged_data_prs %>%
+  select(type, 
+         male, agelab, DIABETES_c,bmi) %>%
+    tbl_summary(statistic = list(all_continuous() ~ "{mean} ({sd})"), missing = "no", label = list(type ~ "Exposure Category", DIABETES_c ~ "Type II Diabetes Cases",agelab~"Age",male ~ "Male", bmi ~ "BMI")) %>%
+        add_n() %>% as_gt() %>%
+              gt::tab_style(
+                style = gt::cell_text(weight = "bold"),
+                locations = gt::cells_row_groups(groups = everything())
+              ) %>%
+              gt::tab_header(title = "N = 950 Genetic Sample Cohort")
+```
+
+
+#### Table S3/S12: Distribution of BMI PRS
+```{r}
+S3 = DHWFS_merged_data_prs %>%
+  select(exposure, 
+         bmi_score,pred_auto_bmi) %>%
+  tbl_strata(
+    strata = exposure,
+    .tbl_fun =
+      ~ .x %>%
+      tbl_summary(statistic = list(all_continuous() ~ "{mean} ({sd})"), missing = "no", label = list(bmi_score~"BMI PRS (PRSice)", pred_auto_bmi ~ "BMI PRS (LDpred)")),
+    .header = "**{strata}**, N = {n}")
+
+DHWFS_merged_data$gencog = as.numeric(scale(DHWFS_merged_data$gencog, center = TRUE, scale = TRUE))
+DHWFS_merged_data$gebgew = as.numeric(scale(DHWFS_merged_data$gebgew, center = TRUE, scale = TRUE))
+DHWFS_merged_data$bmi_raw = DHWFS_merged_data$bmi
+
+DHWFS_merged_data$bmi = as.numeric(scale(DHWFS_merged_data$bmi, center = TRUE, scale = TRUE))
+DHWFS_merged_data$ht = as.numeric(scale(DHWFS_merged_data$ht, center = TRUE, scale = TRUE))
+DHWFS_merged_data$gebgew = as.numeric(DHWFS_merged_data$gebgew)
+DHWFS_merged_data$agelabsq = DHWFS_merged_data$agelab^2
+
+
+DHWFS_merged_data_prs = DHWFS_merged_data %>% drop_na(bmi_score)
+```
+
+
+## Creating sub samples for analysis: 
+```{r}
+#1 time, 2 sib, 3 exposed
+DHWFS_merged_data_prs %>% group_by(catthree3) %>% summarise(n = n()) %>% knitr::kable()
+
+DHWFS_merged_data_prs_female = DHWFS_merged_data_prs %>% 
+  filter(male == 0)
+
+DHWFS_merged_data_prs_male = DHWFS_merged_data_prs %>% 
+  filter(male == 1)
+
+#716 individuals after taking out siblings of time controls
+DHWFS_merged_data_prs_sib_1 = DHWFS_merged_data_prs %>% 
+  filter(famexp == 1)
+
+#452 individuals after taking out remaining singleton births
+idfam_sibling_pairs_prs_sib = DHWFS_merged_data_prs_sib_1 %>%  #226
+  group_by(idfam) %>% 
+  summarize(n = n()) %>% 
+  filter(n == 2) %>% 
+  pull(idfam)
+
+DHWFS_merged_data_prs_sib = DHWFS_merged_data_prs_sib_1 %>% 
+  filter(idfam %in% idfam_sibling_pairs_prs_sib)
+
+DHWFS_merged_data_prs_sib_byrdiff = DHWFS_merged_data_prs_sib %>% 
+  select(hofnum1, idfam, anywk_new2,exposure,byr, sex) %>% 
+  pivot_wider(names_from = exposure, values_from = byr) %>% 
+  group_by(idfam) %>% 
+  summarise(across(c("exposed", "unexposed"), ~sum(., na.rm = TRUE)))
+
+DHWFS_merged_data_prs_sib_byrdiff$byrdiff_c= DHWFS_merged_data_prs_sib_byrdiff$exposed - DHWFS_merged_data_prs_sib_byrdiff$unexposed
+
+DHWFS_merged_data_prs_sib_byrdiff = DHWFS_merged_data_prs_sib_byrdiff %>% 
+  mutate(prefamine_sibcontrol = ifelse(byrdiff_c > 0, 1,0))
+
+
+
+DHWFS_merged_data_prs_sib = DHWFS_merged_data_prs_sib %>% 
+  full_join(DHWFS_merged_data_prs_sib_byrdiff, by = "idfam")
+
+
+
+summary_tbl_power_sib = DHWFS_merged_data_prs_sib %>%
+  select(exposure, 
+         bmi_score,pred_auto_bmi) %>%
+  tbl_strata(
+    strata = exposure,
+    .tbl_fun =
+      ~ .x %>%
+      tbl_summary(statistic = list(all_continuous() ~ "{mean} ({sd})"), missing = "no", label = list(bmi_score~"BMI PRS (PRSice)", pred_auto_bmi ~ "BMI PRS (LDpred)")),
+    .header = "**{strata}**, N = {n}")
+summary_tbl_power_sib
+
+DHWFS_merged_data_prs_time = DHWFS_merged_data_prs %>% filter(catthree3 == 1 | catthree3 == 3)
+
+DHWFS_merged_data_prs_timeonly = DHWFS_merged_data_prs %>% 
+  filter(type == "time control")
+
+DHWFS_merged_data_prs_exponly = DHWFS_merged_data_prs %>% 
+  filter(exposure == "exposed")
+
+DHWFS_merged_data_prs_unexponly = DHWFS_merged_data_prs %>% 
+  filter(exposure == "unexposed")
+
+DHWFS_merged_data_prs_expsib = DHWFS_merged_data_prs %>% 
+  filter(type_new == "Sibling Controls of Famine-exposed")
+```
+
+
+## Main Famine effect
+
+#### Table S4/S6/S13/S15.panel A: main effects of famine exposure and genetic risk on BMI.        
+S4/13 for main analysis with LDpred and PRSice PGIs, respectively.               
+S6/15 for sex-stratified analysis with LDpred and PRSice PGIs, respectively.          
+```{r}
+bmi_famine_geelm <- geeglm(formula = bmi ~ anywk_new2 + male + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi_famine_geelm_t = tbl_regression(bmi_famine_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include ="anywk_new2") %>% add_n(location = "label") 
+
+#### Primary female
+bmi_famine_female_geelm <- geeglm(formula = bmi ~ anywk_new2 + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi_famine_female_geelm_t = tbl_regression(bmi_famine_female_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include ="anywk_new2") %>% add_n(location = "label")
+
+#### Primary male
+bmi_famine_male_geelm <- geeglm(formula = bmi ~ anywk_new2 + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi_famine_male_geelm_t = tbl_regression(bmi_famine_male_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include ="anywk_new2") %>% add_n(location = "label")
+
+
+#### Sibling
+bmi_famine_felm <- plm(bmi ~ anywk_new2  + agelab + agelabsq,data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+bmi_famine_felm_t = tbl_regression(bmi_famine_felm, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include ="anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+#### Exposed vs Time control
+bmi_famine_between_geelm <- glm(formula = bmi ~ anywk_new2 + sex,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+bmi_famine_between_geelm_t = tbl_regression(bmi_famine_between_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include = "anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+#### Primary adjusted for PRS
+bmi_famine_adjLDpredPRS_geelm <- geeglm(formula = bmi ~ anywk_new2 + pred_auto_bmi + sex + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi_famine_adjLDpredPRS_geelm_t = tbl_regression(bmi_famine_adjLDpredPRS_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include = "anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+bmi_famine_adjPRSicePRS_geelm <- geeglm(formula = bmi ~ anywk_new2 + bmi_score + sex + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi_famine_adjPRSicePRS_geelm_t = tbl_regression(bmi_famine_adjPRSicePRS_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include = "anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+#### Sibling adjusted for PRS
+bmi_famine_adjLDpredPRS_felm <- plm(bmi ~ anywk_new2 + agelab + agelabsq + pred_auto_bmi,data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+bmi_famine_adjLDpredPRS_felm_t = tbl_regression(bmi_famine_adjLDpredPRS_felm, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include ="anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+
+bmi_famine_adjPRSicePRS_felm <- plm(bmi ~ anywk_new2 + agelab + agelabsq + bmi_score,data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+bmi_famine_adjPRSicePRS_felm_t = tbl_regression(bmi_famine_adjPRSicePRS_felm, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include ="anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+
+#### Between family adjusted for PRS
+bmi_famine_between_adjLDpredPRS_geelm <- glm(formula = bmi ~ anywk_new2 + sex + pred_auto_bmi,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+bmi_famine_between_adjLDpredPRS_geelm_t = tbl_regression(bmi_famine_between_adjLDpredPRS_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include = "anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+bmi_famine_between_adjPRSicePRS_geelm <- glm(formula = bmi ~ anywk_new2 + sex + bmi_score,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+bmi_famine_between_adjPRSicePRS_geelm_t = tbl_regression(bmi_famine_between_adjPRSicePRS_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include = "anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+## Text of sex difference
+bmi_famine_sex_geelm <- geeglm(formula = bmi ~ anywk_new2*male + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+tbl_regression(bmi_famine_sex_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2:male") %>% add_n(location = "label")%>% modify_caption("Test of sex difference: ME of Famine")
+ 
+
+## Table S4/S6 Panel A
+bmi_famine_table <-tbl_stack(tbls = list(bmi_famine_geelm_t, bmi_famine_felm_t,bmi_famine_between_geelm_t , bmi_famine_adjLDpredPRS_geelm_t, bmi_famine_adjLDpredPRS_felm_t, bmi_famine_between_adjLDpredPRS_geelm_t),
+                        group_header = c("Primary analysis",
+                                         "Sibling Difference",
+                                         "Exposed vs. Time controls",
+                                         "Primary + adjusted for LDpred PRS",
+                                         "Sibling Diff + adjusted for LDpred PRS",
+                                         "Exposed vs. Time + adjusted for LDpred PRS")) %>% as_gt() %>%
+              gt::tab_style(
+                style = gt::cell_text(weight = "bold"),
+                locations = gt::cells_row_groups(groups = everything())
+              ) %>%
+              gt::tab_header(title = "Main Famine Effect: BMI ~ Famine")
+
+bmi_famine_table
+
+## Table S13/S15 Panel A
+bmi_famine_table3 <-tbl_stack(tbls = list(bmi_famine_geelm_t, bmi_famine_felm_t,bmi_famine_between_geelm_t, bmi_famine_adjPRSicePRS_geelm_t, bmi_famine_adjPRSicePRS_felm_t, bmi_famine_between_adjPRSicePRS_geelm_t),
+                        group_header = c("Primary analysis",
+                                         "Sibling Difference",
+                                         "Exposed vs. Time controls",
+                                         "Primary + adjusted for PRSice PRS",
+                                         "Sibling Diff + adjusted for PRSice PRS",
+                                         "Exposed vs. Time + adjusted for PRSice PRS")) %>% as_gt() %>%
+              gt::tab_style(
+                style = gt::cell_text(weight = "bold"),
+                locations = gt::cells_row_groups(groups = everything())
+              ) %>%
+              gt::tab_header(title = "Main Famine Effect: BMI ~ Famine")
+
+bmi_famine_table3
+```
+
+
+#### Table S5/S7/S14/S16.panel A: main effects of famine exposure and genetic risk on BMI adjusted by preconceptual exposure groups (D-1 and D0)      
+S5/7 for main analysis with LDpred and PRSice PGIs, respectively.               
+S14/16 for sex-stratified analysis with LDpred and PRSice PGIs, respectively.    
+```{r}
+## Primary
+bmi_famine_geelm <- geeglm(formula = bmi ~ anywk_new2 + male + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi_famine_geelm_t = tbl_regression(bmi_famine_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include ="anywk_new2") %>% add_n(location = "label") 
+
+## Primary female
+bmi_famine_female_geelm <- geeglm(formula = bmi ~ anywk_new2 + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi_famine_female_geelm_t = tbl_regression(bmi_famine_female_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include ="anywk_new2") %>% add_n(location = "label")
+
+## Primary male
+bmi_famine_male_geelm <- geeglm(formula = bmi ~ anywk_new2 + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi_famine_male_geelm_t = tbl_regression(bmi_famine_male_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include ="anywk_new2") %>% add_n(location = "label")
+
+
+## Sibling
+bmi_famine_felm <- plm(bmi ~ anywk_new2  + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2,data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+bmi_famine_felm_t = tbl_regression(bmi_famine_felm, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include ="anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+## Exposed vs Time control
+bmi_famine_between_geelm <- glm(formula = bmi ~ anywk_new2 + sex + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+bmi_famine_between_geelm_t = tbl_regression(bmi_famine_between_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include = "anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+## adjusted for PRS
+bmi_famine_adjLDpredPRS_geelm <- geeglm(formula = bmi ~ anywk_new2 + pred_auto_bmi + sex + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi_famine_adjLDpredPRS_geelm_t = tbl_regression(bmi_famine_adjLDpredPRS_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include = "anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+bmi_famine_adjPRSicePRS_geelm <- geeglm(formula = bmi ~ anywk_new2 + bmi_score + sex + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi_famine_adjPRSicePRS_geelm_t = tbl_regression(bmi_famine_adjPRSicePRS_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include = "anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+
+## Sibling adjusted for PRS
+bmi_famine_adjLDpredPRS_felm <- plm(bmi ~ anywk_new2 + agelab + agelabsq + pred_auto_bmi+ dwk_neg1vsall_new2 + dwk0vsall_new2,data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+bmi_famine_adjLDpredPRS_felm_t = tbl_regression(bmi_famine_adjLDpredPRS_felm, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include ="anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+
+bmi_famine_adjPRSicePRS_felm <- plm(bmi ~ anywk_new2 + agelab + agelabsq + bmi_score+ dwk_neg1vsall_new2 + dwk0vsall_new2,data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+bmi_famine_adjPRSicePRS_felm_t = tbl_regression(bmi_famine_adjPRSicePRS_felm, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include ="anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+
+## Between family adjusted for PRS
+bmi_famine_between_adjLDpredPRS_geelm <- glm(formula = bmi ~ anywk_new2 + sex + pred_auto_bmi+ dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+bmi_famine_between_adjLDpredPRS_geelm_t = tbl_regression(bmi_famine_between_adjLDpredPRS_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include = "anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+bmi_famine_between_adjPRSicePRS_geelm <- glm(formula = bmi ~ anywk_new2 + sex + bmi_score+ dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+bmi_famine_between_adjPRSicePRS_geelm_t = tbl_regression(bmi_famine_between_adjPRSicePRS_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = anywk_new2 ~ "Famine", include = "anywk_new2") %>% add_n(location = "label")%>% add_n(location = "label")
+
+
+
+bmi_famine_table <-tbl_stack(tbls = list(bmi_famine_geelm_t, bmi_famine_female_geelm_t, bmi_famine_male_geelm_t, bmi_famine_felm_t,bmi_famine_between_geelm_t, bmi_famine_adjLDpredPRS_geelm_t, bmi_famine_adjLDpredPRS_felm_t, bmi_famine_between_adjLDpredPRS_geelm_t, bmi_famine_adjPRSicePRS_geelm_t, bmi_famine_adjPRSicePRS_felm_t, bmi_famine_between_adjPRSicePRS_geelm_t),
+                        group_header = c("Primary analysis",
+                                         "Primary analysis (female)",
+                                         "Primary analysis (male)",
+                                         "Sibling Difference",
+                                         "Exposed vs. Time controls",
+                                         "Primary + adjusted for LDpred PRS",
+                                         "Sibling Diff + adjusted for LDpred PRS",
+                                         "Exposed vs. Time + adjusted for LDpred PRS",
+                                         "Primary + adjusted for PRSice PRS",
+                                         "Sibling Diff + adjusted for PRSice PRS",
+                                         "Exposed vs. Time + adjusted for PRSice PRS")) %>% as_gt() %>%
+              gt::tab_style(
+                style = gt::cell_text(weight = "bold"),
+                locations = gt::cells_row_groups(groups = everything())
+              ) %>%
+              gt::tab_header(title = "Main Famine Effect: BMI ~ Famine")
+
+bmi_famine_table
+```
+
+
+#### Figure 3 Panel A:
+```{r}
+## Dataframe for Figure 3 Panel a:
+bmi_famine_gee_row = tidy(bmi_famine_geelm) %>% 
+  cbind(as_tibble(confint.lm(bmi_famine_geelm))) %>% 
+  filter(term == "anywk_new2") %>% 
+  mutate(across('term', str_replace, 'anywk_new2', 'Primary Analysis'))
+
+bmi_famine_fe_row = tidy(bmi_famine_felm) %>% 
+  cbind(as_tibble(confint.lm(bmi_famine_felm))) %>% 
+  filter(term == "anywk_new2") %>% 
+  mutate(across('term', str_replace, 'anywk_new2', 'Sibling Differences'))
+
+bmi_famine_between_gee_row = tidy(bmi_famine_between_geelm) %>% 
+  cbind(as_tibble(confint.lm(bmi_famine_between_geelm))) %>% 
+  filter(term == "anywk_new2") %>% 
+  mutate(across('term', str_replace, 'anywk_new2', 'Exposed vs. Time Controls'))
+
+bmi_famine_adjLDpredPRS_gee_row = tidy(bmi_famine_adjLDpredPRS_geelm) %>% 
+  cbind(as_tibble(confint.lm(bmi_famine_adjLDpredPRS_geelm))) %>% 
+  filter(term == "anywk_new2") %>% 
+  mutate(across('term', str_replace, 'anywk_new2', 'Primary Analysis \n (PGI adjusted)'))
+
+bmi_famine_adjLDpredPRS_felm_row = tidy(bmi_famine_adjLDpredPRS_felm) %>% 
+  cbind(as_tibble(confint.lm(bmi_famine_adjLDpredPRS_felm))) %>% 
+  filter(term == "anywk_new2") %>% 
+  mutate(across('term', str_replace, 'anywk_new2', 'Sibling Differences \n (PGI adjusted)'))
+
+bmi_famine_between_adjLDpredPRS_glm_row = tidy(bmi_famine_between_adjLDpredPRS_geelm) %>% 
+  cbind(as_tibble(confint.lm(bmi_famine_between_adjLDpredPRS_geelm))) %>% 
+  filter(term == "anywk_new2") %>% 
+  mutate(across('term', str_replace, 'anywk_new2', 'Exposed vs. Time Controls \n (PGI adjusted)'))
+
+bmi_famine_adjldpred_df = bmi_famine_gee_row %>% 
+  rbind(bmi_famine_between_gee_row) %>% 
+  rbind(bmi_famine_fe_row) %>% 
+  rbind(bmi_famine_adjLDpredPRS_gee_row) %>%
+  rbind(bmi_famine_between_adjLDpredPRS_glm_row) %>% 
+  rbind(bmi_famine_adjLDpredPRS_felm_row)
+
+
+
+bmi_famine_adjldpred_df$term<- factor(bmi_famine_adjldpred_df$term,
+levels = c("Primary Analysis", "Exposed vs. Time Controls","Sibling Differences", "Primary Analysis \n (PGI adjusted)", "Exposed vs. Time Controls \n (PGI adjusted)","Sibling Differences \n (PGI adjusted)"))
+bmi_famine_adjldpred_df$group = c("A", "B", "C", "A", "B", "C")
+bmi_famine_adjldpred_df$group = factor(bmi_famine_adjldpred_df$group,
+levels =c("A", "B", "C"))
+
+
+bmi_famine_adjldpred_df$subgroup = c("Unadjusted by BMI PGI", "Unadjusted by BMI PGI", "Unadjusted by BMI PGI","Adjusted by BMI PGI", "Adjusted by BMI PGI","Adjusted by BMI PGI")
+bmi_famine_adjldpred_df$subgroup = factor(bmi_famine_adjldpred_df$subgroup,
+levels =c("Unadjusted by BMI PGI", "Adjusted by BMI PGI"))
+
+
+
+## Figure 3 Panel A:
+ggplot(bmi_famine_adjldpred_df, aes(term, estimate, color = term, alpha = subgroup), show.legend = FALSE) +        # ggplot2 plot with confidence intervals
+  geom_point(size = 8) +
+  scale_color_manual(values = c( "#FE9F6DFF", "#8C2981FF", "#3B0F70FF",
+                                 "#FE9F6DFF", "#8C2981FF", "#3B0F70FF"))+
+  #scale_color_manual(values = c( "#20114BFF", "#A8327DFF", "#FA7F5EFF",
+  #                               "#20114BFF", "#A8327DFF", "#FA7F5EFF"))+
+  #scale_color_manual(values = c( "#20114BFF", "#A8327DFF", "#FA7F5EFF",
+  #                              "#57157EFF", "#DE4968FF","#FEBF84FF"))+
+  scale_alpha_discrete(range = c(1, 0.4))+
+  geom_errorbar(aes(ymin = `2.5 %`, ymax = `97.5 %`), size= 1, width = 0.3)+
+  facet_grid(. ~ group, scales = "free_x")+
+    labs(
+    x = "Model",
+    y = "Effect Size"
+  )+
+  geom_line(size= 1, alpha = 1) +
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  theme_minimal()+
+  theme(aspect.ratio = 2, axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), text = element_text(size = 30), legend.position = 'none')
+```
+
+
+
+## Main PGI effect
+
+#### Table S4/S5/S13/S15 Panel A second half: Main PGI effect and genetic association with BMI
+S4/13 for main analysis with LDpred and PRSice PGIs, respectively.               
+S6/15 for sex-stratified analysis with LDpred and PRSice PGIs, respectively. 
+```{r}
+## FULL
+bmi1_ME_geelm1 <- geeglm(formula = bmi ~ pred_auto_bmi + male + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi1_ME_geelm1_t = tbl_regression(bmi1_ME_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = pred_auto_bmi ~ "BMI PRS", include ="pred_auto_bmi") %>% add_n(location = "label")
+
+
+
+bmi2_ME_geelm1 <- geeglm(formula = bmi ~ bmi_score + male + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi2_ME_geelm1_t = tbl_regression(bmi2_ME_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3),  label = bmi_score ~ "BMI PRS", include ="bmi_score")
+bmi1_ME_geelm1_t$table_body$variable = bmi2_ME_geelm1_t$table_body$variable = "prs"
+
+bmi_geeME_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_geelm1_t, bmi2_ME_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+bmiprsmaineffect_full = tidy(bmi1_ME_geelm1) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_geelm1))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'BMI PRS Full'))
+
+#SEX
+bmi1_ME_geelm1_female <- geeglm(formula = bmi ~ pred_auto_bmi + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi1_ME_geelm1_female_t = tbl_regression(bmi1_ME_geelm1_female,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = pred_auto_bmi ~ "BMI PRS", include ="pred_auto_bmi") %>% add_n(location = "label")
+
+bmi2_ME_geelm1_female <- geeglm(formula = bmi ~ bmi_score + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi2_ME_geelm1_female_t = tbl_regression(bmi2_ME_geelm1_female,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3),  label = bmi_score ~ "BMI PRS", include ="bmi_score")
+
+bmi1_ME_geelm1_female_t$table_body$variable = bmi2_ME_geelm1_female_t$table_body$variable = "prs"
+
+bmi_geeME_merge_female_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_geelm1_female_t, bmi2_ME_geelm1_female_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+bmiprsmaineffect_female = tidy(bmi1_ME_geelm1_female) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_geelm1_female))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'BMI PRS Female'))
+
+
+bmi1_ME_geelm1_male <- geeglm(formula = bmi ~ pred_auto_bmi + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi1_ME_geelm1_male_t = tbl_regression(bmi1_ME_geelm1_male,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = pred_auto_bmi ~ "BMI PRS", include ="pred_auto_bmi")%>% add_n(location = "label")
+
+bmi2_ME_geelm1_male <- geeglm(formula = bmi ~ bmi_score + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi2_ME_geelm1_male_t = tbl_regression(bmi2_ME_geelm1_male,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3),  label = bmi_score ~ "BMI PRS", include ="bmi_score")
+
+bmi1_ME_geelm1_male_t$table_body$variable = bmi2_ME_geelm1_male_t$table_body$variable = "prs"
+
+bmi_geeME_merge_male_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_geelm1_male_t, bmi2_ME_geelm1_male_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+bmiprsmaineffect_male = tidy(bmi1_ME_geelm1_male) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_geelm1_male))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'BMI PRS Male'))
+
+
+# Test of sex difference
+bmi1_prs_sex_geelm <- geeglm(formula = bmi ~ pred_auto_bmi*male + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+tbl_regression(bmi1_prs_sex_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="pred_auto_bmi:male") %>% add_n(location = "label") %>% modify_caption("Test of sex difference: ME of LDpred2 PRS")
+
+
+bmi2_prs_sex_geelm <- geeglm(formula = bmi ~ bmi_score*male + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+tbl_regression(bmi2_prs_sex_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="bmi_score:male") %>% add_n(location = "label")%>% modify_caption("Test of sex difference: ME of PRSice2 PRS") 
+
+
+
+
+# Sibling
+bmi1_ME_fe0 <- plm(bmi ~ pred_auto_bmi + agelab + agelabsq, data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+
+bmi1_ME_fe0_t = tbl_regression(bmi1_ME_fe0, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "pred_auto_bmi",label = pred_auto_bmi ~ "BMI PRS")%>% add_n(location = "label")
+
+bmi2_ME_fe0 <- plm(bmi ~ bmi_score+ agelab + agelabsq, data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+
+bmi2_ME_fe0_t = tbl_regression(bmi2_ME_fe0, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "bmi_score", label = bmi_score ~ "BMI PRS")
+
+bmi1_ME_fe0_t$table_body$variable = bmi2_ME_fe0_t$table_body$variable = "prs"
+
+bmi_feME_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_fe0_t, bmi2_ME_fe0_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  ) 
+
+# Exposed vs Time
+bmi1_ME_between_geelm1 <- glm(formula = bmi ~ pred_auto_bmi + male,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+bmi1_ME_between_geelm1_t = tbl_regression(bmi1_ME_between_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "pred_auto_bmi",label = pred_auto_bmi ~ "BMI PRS")%>% add_n(location = "label")
+
+bmi2_ME_between_geelm1 <- glm(formula = bmi ~ bmi_score+ male,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+bmi2_ME_between_geelm1_t = tbl_regression(bmi2_ME_between_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "bmi_score", label = bmi_score ~ "BMI PRS")
+
+bmi1_ME_between_geelm1_t$table_body$variable = bmi2_ME_between_geelm1_t$table_body$variable = "prs"
+
+bmi_ME_between_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_between_geelm1_t, bmi2_ME_between_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  ) 
+
+# Time only
+bmi1_ME_timeonly_geelm1 <- glm(formula = bmi ~ pred_auto_bmi + male,
+                      data = DHWFS_merged_data_prs_timeonly,
+                      family  = gaussian(link = "identity"))
+
+bmi1_ME_timeonly_geelm1_t = tbl_regression(bmi1_ME_timeonly_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "pred_auto_bmi",label = pred_auto_bmi ~ "BMI PRS")%>% add_n(location = "label")
+
+bmi2_ME_timeonly_geelm1 <- glm(formula = bmi ~ bmi_score + male,
+                      data = DHWFS_merged_data_prs_timeonly,
+                      family  = gaussian(link = "identity"))
+
+bmi2_ME_timeonly_geelm1_t = tbl_regression(bmi2_ME_timeonly_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "bmi_score", label = bmi_score ~ "BMI PRS")
+
+
+bmi1_ME_timeonly_geelm1_t$table_body$variable = bmi2_ME_timeonly_geelm1_t$table_body$variable = "prs"
+
+bmi_ME_timeonly_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_timeonly_geelm1_t, bmi2_ME_timeonly_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  ) 
+
+# Control only
+bmi1_ME_unexponly_geelm1 <- geeglm(formula = bmi ~ pred_auto_bmi + male + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_unexponly,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi1_ME_unexponly_geelm1_t = tbl_regression(bmi1_ME_unexponly_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "pred_auto_bmi",label = pred_auto_bmi ~ "BMI PRS")%>% add_n(location = "label")
+
+bmi2_ME_unexponly_geelm1 <- geeglm(formula = bmi ~ bmi_score + male + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_unexponly,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi2_ME_unexponly_geelm1_t = tbl_regression(bmi2_ME_unexponly_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "bmi_score", label = bmi_score ~ "BMI PRS")
+
+bmi1_ME_unexponly_geelm1_t$table_body$variable = bmi2_ME_unexponly_geelm1_t$table_body$variable = "prs"
+
+bmi_ME_unexponly_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_unexponly_geelm1_t, bmi2_ME_unexponly_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  ) 
+
+
+# Exposed only
+bmi1_ME_exponly_geelm1 <- glm(formula = bmi ~ pred_auto_bmi + male,
+                      data = DHWFS_merged_data_prs_exponly,
+                      family  = gaussian(link = "identity"))
+
+bmi1_ME_exponly_geelm1_t = tbl_regression(bmi1_ME_exponly_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "pred_auto_bmi",label = pred_auto_bmi ~ "BMI PRS")%>% add_n(location = "label")
+
+bmi2_ME_exponly_geelm1 <- glm(formula = bmi ~ bmi_score + male,
+                      data = DHWFS_merged_data_prs_exponly,
+                      family  = gaussian(link = "identity"))
+
+bmi2_ME_exponly_geelm1_t = tbl_regression(bmi2_ME_exponly_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "bmi_score", label = bmi_score ~ "BMI PRS")
+
+bmi1_ME_exponly_geelm1_t$table_body$variable = bmi2_ME_exponly_geelm1_t$table_body$variable = "prs"
+
+bmi_ME_exponly_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_exponly_geelm1_t, bmi2_ME_exponly_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  ) 
+
+# Sib controls only
+bmi1_ME_expsib_geelm1 <- glm(formula = bmi ~ pred_auto_bmi + male,
+                      data = DHWFS_merged_data_prs_expsib,
+                      family  = gaussian(link = "identity"))
+
+bmi1_ME_expsib_geelm1_t = tbl_regression(bmi1_ME_expsib_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "pred_auto_bmi",label = pred_auto_bmi ~ "BMI PRS")%>% add_n(location = "label")
+
+bmi2_ME_expsib_geelm1 <- glm(formula = bmi ~ bmi_score + male,
+                      data = DHWFS_merged_data_prs_expsib,
+                      family  = gaussian(link = "identity"))
+
+bmi2_ME_expsib_geelm1_t = tbl_regression(bmi2_ME_expsib_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "bmi_score", label = bmi_score ~ "BMI PRS")
+
+bmi1_ME_expsib_geelm1_t$table_body$variable = bmi2_ME_expsib_geelm1_t$table_body$variable = "prs"
+
+bmi_ME_expsib_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_expsib_geelm1_t, bmi2_ME_expsib_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  ) 
+
+
+bmi_PRS_ME_table <-tbl_stack(tbls = list( bmi_geeME_merge_t, bmi_geeME_merge_female_t,bmi_geeME_merge_male_t,bmi_feME_merge_t, bmi_ME_between_merge_t, bmi_ME_timeonly_merge_t, bmi_ME_unexponly_merge_t, bmi_ME_exponly_merge_t, bmi_ME_expsib_merge_t),
+                        group_header = c("Primary analysis",
+                                         "Primary analysis (female)",
+                                         "Primary analysis (male)",
+                                         "Sibling Difference",
+                                         "Exposed vs. Time controls",
+                                         "Time controls",
+                                         "All controls",
+                                         "All Exposed",
+                                         "All Sib of Exposed")) %>%  
+              as_gt() %>%
+              gt::tab_style(
+                style = gt::cell_text(weight = "bold"),
+                locations = gt::cells_row_groups(groups = everything())
+              ) %>%
+              gt::tab_header(title = "Main PRS Effect: BMI ~ PRS")
+```
+
+
+#### Table S5/S7/S14/S16.panel A.second half: Main PRS effect and genetic association with BMI adjusted by preconceptual exposure groups (D-1 and D0)      
+S5/7 for main analysis with LDpred and PRSice PGIs, respectively.               
+S14/16 for sex-stratified analysis with LDpred and PRSice PGIs, respectively.   
+```{r}
+##FULL
+bmi1_ME_geelm1 <- geeglm(formula = bmi ~ pred_auto_bmi + male + agelab +  agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi1_ME_geelm1_t = tbl_regression(bmi1_ME_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = pred_auto_bmi ~ "BMI PRS", include ="pred_auto_bmi") %>% add_n(location = "label")
+
+bmi2_ME_geelm1 <- geeglm(formula = bmi ~ bmi_score + male + agelab +  agelabsq ,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi2_ME_geelm1_t = tbl_regression(bmi2_ME_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3),  label = bmi_score ~ "BMI PRS", include ="bmi_score")
+
+bmi1_ME_geelm1_t$table_body$variable = bmi2_ME_geelm1_t$table_body$variable = "prs"
+
+bmi_geeME_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_geelm1_t, bmi2_ME_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+bmiprsmaineffect_full = tidy(bmi1_ME_geelm1) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_geelm1))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'BMI PRS Full'))
+
+
+#SEX: full
+bmi1_ME_geelm1_female <- geeglm(formula = bmi ~ pred_auto_bmi + agelab +  agelabsq,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi1_ME_geelm1_female_t = tbl_regression(bmi1_ME_geelm1_female,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = pred_auto_bmi ~ "BMI PRS", include ="pred_auto_bmi") %>% add_n(location = "label")
+
+bmi2_ME_geelm1_female <- geeglm(formula = bmi ~ bmi_score + agelab +  agelabsq,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi2_ME_geelm1_female_t = tbl_regression(bmi2_ME_geelm1_female,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3),  label = bmi_score ~ "BMI PRS", include ="bmi_score")
+
+bmi1_ME_geelm1_female_t$table_body$variable = bmi2_ME_geelm1_female_t$table_body$variable = "prs"
+
+bmi_geeME_merge_female_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_geelm1_female_t, bmi2_ME_geelm1_female_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+bmiprsmaineffect_female = tidy(bmi1_ME_geelm1_female) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_geelm1_female))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'BMI PRS Female'))
+
+
+bmi1_ME_geelm1_male <- geeglm(formula = bmi ~ pred_auto_bmi + agelab +  agelabsq,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi1_ME_geelm1_male_t = tbl_regression(bmi1_ME_geelm1_male,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), label = pred_auto_bmi ~ "BMI PRS", include ="pred_auto_bmi")%>% add_n(location = "label")
+
+bmi2_ME_geelm1_male <- geeglm(formula = bmi ~ bmi_score + agelab +  agelabsq,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi2_ME_geelm1_male_t = tbl_regression(bmi2_ME_geelm1_male,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3),  label = bmi_score ~ "BMI PRS", include ="bmi_score")
+
+bmi1_ME_geelm1_male_t$table_body$variable = bmi2_ME_geelm1_male_t$table_body$variable = "prs"
+
+bmi_geeME_merge_male_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_geelm1_male_t, bmi2_ME_geelm1_male_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+bmiprsmaineffect_male = tidy(bmi1_ME_geelm1_male) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_geelm1_male))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'BMI PRS Male'))
+
+
+
+
+
+
+# Sibling
+bmi1_ME_fe0 <- plm(bmi ~ pred_auto_bmi + agelab +  agelabsq, data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+
+bmi1_ME_fe0_t = tbl_regression(bmi1_ME_fe0, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "pred_auto_bmi",label = pred_auto_bmi ~ "BMI PRS")%>% add_n(location = "label")
+
+bmi2_ME_fe0 <- plm(bmi ~ bmi_score+ agelab +  agelabsq, data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+
+bmi2_ME_fe0_t = tbl_regression(bmi2_ME_fe0, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "bmi_score", label = bmi_score ~ "BMI PRS")
+
+bmi1_ME_fe0_t$table_body$variable = bmi2_ME_fe0_t$table_body$variable = "prs"
+
+bmi_feME_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_fe0_t, bmi2_ME_fe0_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  ) 
+
+# Exposed vs Time
+bmi1_ME_between_geelm1 <- glm(formula = bmi ~ pred_auto_bmi + sex,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+bmi1_ME_between_geelm1_t = tbl_regression(bmi1_ME_between_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "pred_auto_bmi",label = pred_auto_bmi ~ "BMI PRS")%>% add_n(location = "label")
+
+bmi2_ME_between_geelm1 <- glm(formula = bmi ~ bmi_score + sex,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+bmi2_ME_between_geelm1_t = tbl_regression(bmi2_ME_between_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "bmi_score", label = bmi_score ~ "BMI PRS")
+
+bmi1_ME_between_geelm1_t$table_body$variable = bmi2_ME_between_geelm1_t$table_body$variable = "prs"
+
+bmi_ME_between_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_between_geelm1_t, bmi2_ME_between_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  ) 
+
+# Time only
+bmi1_ME_timeonly_geelm1 <- glm(formula = bmi ~ pred_auto_bmi + sex,
+                      data = DHWFS_merged_data_prs_timeonly,
+                      family  = gaussian(link = "identity"))
+
+bmi1_ME_timeonly_geelm1_t = tbl_regression(bmi1_ME_timeonly_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "pred_auto_bmi",label = pred_auto_bmi ~ "BMI PRS")%>% add_n(location = "label")
+
+bmi2_ME_timeonly_geelm1 <- glm(formula = bmi ~ bmi_score + sex,
+                      data = DHWFS_merged_data_prs_timeonly,
+                      family  = gaussian(link = "identity"))
+
+bmi2_ME_timeonly_geelm1_t = tbl_regression(bmi2_ME_timeonly_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "bmi_score", label = bmi_score ~ "BMI PRS")
+
+bmi1_ME_timeonly_geelm1_t$table_body$variable = bmi2_ME_timeonly_geelm1_t$table_body$variable = "prs"
+
+bmi_ME_timeonly_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_timeonly_geelm1_t, bmi2_ME_timeonly_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  ) 
+
+# Control only
+bmi1_ME_unexponly_geelm1 <- geeglm(formula = bmi ~ pred_auto_bmi +sex+ agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_unexponly,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi1_ME_unexponly_geelm1_t = tbl_regression(bmi1_ME_unexponly_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "pred_auto_bmi",label = pred_auto_bmi ~ "BMI PRS")%>% add_n(location = "label")
+
+bmi2_ME_unexponly_geelm1 <- geeglm(formula = bmi ~ bmi_score + sex + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_unexponly,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi2_ME_unexponly_geelm1_t = tbl_regression(bmi2_ME_unexponly_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "bmi_score", label = bmi_score ~ "BMI PRS")
+
+bmi1_ME_unexponly_geelm1_t$table_body$variable = bmi2_ME_unexponly_geelm1_t$table_body$variable = "prs"
+
+bmi_ME_unexponly_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_unexponly_geelm1_t, bmi2_ME_unexponly_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  ) 
+
+
+# Exposed only
+bmi1_ME_exponly_geelm1 <- glm(formula = bmi ~ pred_auto_bmi + sex,
+                      data = DHWFS_merged_data_prs_exponly,
+                      family  = gaussian(link = "identity"))
+
+bmi1_ME_exponly_geelm1_t = tbl_regression(bmi1_ME_exponly_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "pred_auto_bmi",label = pred_auto_bmi ~ "BMI PRS")%>% add_n(location = "label")
+
+bmi2_ME_exponly_geelm1 <- glm(formula = bmi ~ bmi_score + sex,
+                      data = DHWFS_merged_data_prs_exponly,
+                      family  = gaussian(link = "identity"))
+
+bmi2_ME_exponly_geelm1_t = tbl_regression(bmi2_ME_exponly_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "bmi_score", label = bmi_score ~ "BMI PRS")
+
+bmi1_ME_exponly_geelm1_t$table_body$variable = bmi2_ME_exponly_geelm1_t$table_body$variable = "prs"
+
+bmi_ME_exponly_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_ME_exponly_geelm1_t, bmi2_ME_exponly_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  ) 
+
+
+
+
+bmi_PRS_ME_table <-tbl_stack(tbls = list( bmi_geeME_merge_t, bmi_geeME_merge_female_t,bmi_geeME_merge_male_t,bmi_feME_merge_t, bmi_ME_between_merge_t, bmi_ME_timeonly_merge_t, bmi_ME_unexponly_merge_t, bmi_ME_exponly_merge_t),
+                        group_header = c("Primary analysis",
+                                         "Primary analysis (female)",
+                                         "Primary analysis (male)",
+                                         "Sibling Difference",
+                                         "Exposed vs. Time controls",
+                                         "Time controls",
+                                         "All controls",
+                                         "All Exposed")) %>%  
+              as_gt() %>%
+              gt::tab_style(
+                style = gt::cell_text(weight = "bold"),
+                locations = gt::cells_row_groups(groups = everything())
+              ) %>%
+              gt::tab_header(title = "Main PRS Effect: BMI ~ PRS")
+             
+
+bmi_PRS_ME_table
+```
+
+
+
+#### Figure 3 Panel B: Main PRS effect
+```{r}
+## Figure 3.B: Effect size estimates for PRS exposure
+bmi1_PRS_gee_row = tidy(bmi1_ME_geelm1) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_geelm1))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'Primary Analysis'))
+bmi1_PRS_fe_row = tidy(bmi1_ME_fe0) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_fe0))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'Sibling Differences'))
+bmi1_PRS_between_gee_row = tidy(bmi1_ME_between_geelm1) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_between_geelm1))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'Exposed vs. Time Controls'))
+bmi1_PRS_timeonly_gee_row = tidy(bmi1_ME_timeonly_geelm1) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_timeonly_geelm1))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'Main Effect in Time Controls'))
+bmi1_PRS_unexponly_gee_row = tidy(bmi1_ME_unexponly_geelm1) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_unexponly_geelm1))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'Main Effect in Controls'))
+bmi1_PRS_exponly_gee_row = tidy(bmi1_ME_exponly_geelm1) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_exponly_geelm1))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'Main Effect in Famine-exposed'))
+bmi1_PRS_expsib_gee_row = tidy(bmi1_ME_expsib_geelm1) %>% 
+  cbind(as_tibble(confint.lm(bmi1_ME_expsib_geelm1))) %>% 
+  filter(term == "pred_auto_bmi") %>% 
+  mutate(across('term', str_replace, 'pred_auto_bmi', 'Main Effect in Sibing Controls'))
+
+
+
+
+bmi_LDpredPRS_df1 = bmi1_PRS_gee_row %>% 
+  rbind(bmi1_PRS_between_gee_row) %>% 
+  rbind(bmi1_PRS_fe_row)
+
+bmi_LDpredPRS_df2 = bmi1_PRS_exponly_gee_row %>% 
+  rbind(bmi1_PRS_timeonly_gee_row) %>% 
+  rbind(bmi1_PRS_expsib_gee_row) %>% 
+  rbind(bmi1_PRS_unexponly_gee_row)
+
+bmi_LDpredPRS_df1$term<- factor(bmi_LDpredPRS_df1$term,
+levels = c("Primary Analysis", "Exposed vs. Time Controls", "Sibling Differences"))
+
+bmi_LDpredPRS_df2$term<- factor(bmi_LDpredPRS_df2$term,
+levels = c("Main Effect in Famine-exposed","Main Effect in Time Controls","Main Effect in Sibing Controls","Main Effect in Controls"))
+
+
+ggplot(bmi_LDpredPRS_df1, aes(term, estimate, color = term)) +        # ggplot2 plot with confidence intervals
+  geom_point(size = 8, show.legend = FALSE) +
+  scale_color_manual(values = c( "#FE9F6DFF", "#8C2981FF", "#3B0F70FF"))+
+  geom_errorbar(aes(ymin = `2.5 %`, ymax = `97.5 %`), size= 1, width = 0.3)+
+    labs(
+    x = "Model",
+    y = "Effect Size"
+  )+
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  theme_minimal()+
+  theme(aspect.ratio = 2,axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, margin = margin(t = 30)), text = element_text(size = 30), legend.position = 'none')
+```
+
+
+## Gene environment correlation (rGE)
+
+#### Figure 3 Panel C: PRS distribution by Exposure Category
+```{r}
+DHWFS_merged_data_prs_boxplot = bind_rows("Famine-exposed" = DHWFS_merged_data_prs_exponly,
+          "Time Controls" =  DHWFS_merged_data_prs_timeonly,
+          "Sibling Controls" =  DHWFS_merged_data_prs_expsib,
+          "All Controls" = DHWFS_merged_data_prs_unexponly,
+          .id = "group2"
+          ) %>% 
+  mutate(group2 = factor(group2,levels = c("Famine-exposed", "Time Controls", "Sibling Controls","All Controls")))
+
+
+ggplot(DHWFS_merged_data_prs_boxplot, aes(x = group2, y = pred_auto_bmi, fill = group2, alpha = group2)) +
+  geom_boxplot(lwd = 0.2, width = 0.5, outlier.shape = NA, show.legend = FALSE) +
+  geom_jitter(aes(color = group2), width = 0.08, alpha = 0.1, show.legend = FALSE)+
+  scale_color_manual(values = c( "#FE9F6DFF",  "#8C2981FF", "#3B0F70FF", "#20114BFF"))+
+  scale_fill_manual(values = c("#FE9F6DFF",  "#8C2981FF", "#3B0F70FF", "#20114BFF"))+
+  scale_alpha_discrete(range = c(0.8, 0.7, 0.7, 0.7 )) + # Zoom without cutting values
+  coord_cartesian(ylim = c(-2.1, 2.1))+
+  labs(
+  x = "Exposure Category",
+  y = "PRS",
+  colour = "Exposure Group"
+   ) +
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  theme_minimal()+
+  theme(aspect.ratio = 1,axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, margin = margin(t = 30)), text = element_text(size = 30))
+```
+
+
+
+#### Table S4/S6/S13/S15 Panel B: rGE
+S4/13 for main analysis with LDpred and PRSice PGIs, respectively.               
+S6/15 for sex-stratified analysis with LDpred and PRSice PGIs, respectively. 
+```{r}
+#Full
+bmi1_rGE_geelm1 <- geeglm(formula = pred_auto_bmi ~ anywk_new2+ sex + agelab +  agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi1_rGE_geelm1_t = tbl_regression(bmi1_rGE_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2", label = anywk_new2 ~ "Famine exposed") %>% add_n(location = "label")
+
+bmi2_rGE_geelm1 <- geeglm(formula = bmi_score ~ anywk_new2+ sex + agelab +  agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi2_rGE_geelm1_t = tbl_regression(bmi2_rGE_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2", label = anywk_new2 ~ "Famine exposed")
+
+bmi1_rGE_geelm1_t$table_body$variable = bmi2_rGE_geelm1_t$table_body$variable = "exposure"
+
+bmi_geerGE_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_rGE_geelm1_t, bmi2_rGE_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+#Sex-full
+bmi1_rGE_geelm1_female <- geeglm(formula = pred_auto_bmi ~ anywk_new2 + agelab +  agelabsq,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi1_rGE_geelm1_female_t = tbl_regression(bmi1_rGE_geelm1_female,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2", label = anywk_new2 ~ "Famine exposed") %>% add_n(location = "label")
+
+bmi2_rGE_geelm1_female <- geeglm(formula = bmi_score ~ anywk_new2+ agelab +  agelabsq,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi2_rGE_geelm1_female_t = tbl_regression(bmi2_rGE_geelm1_female,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2", label = anywk_new2 ~ "Famine exposed") 
+
+bmi1_rGE_geelm1_female_t$table_body$variable = bmi2_rGE_geelm1_female_t$table_body$variable = "exposure"
+
+bmi_geerGE_merge_female_t <-
+  tbl_merge(
+    tbls = list(bmi1_rGE_geelm1_female_t, bmi2_rGE_geelm1_female_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+bmi1_rGE_geelm1_male <- geeglm(formula = pred_auto_bmi ~ anywk_new2 + agelab +  agelabsq,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi1_rGE_geelm1_male_t = tbl_regression(bmi1_rGE_geelm1_male,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2", label = anywk_new2 ~ "Famine exposed") %>% add_n(location = "label")
+
+bmi2_rGE_geelm1_male <- geeglm(formula = bmi_score ~ anywk_new2 + agelab +  agelabsq,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi2_rGE_geelm1_male_t = tbl_regression(bmi2_rGE_geelm1_male,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2", label = anywk_new2 ~ "Famine exposed") 
+
+bmi1_rGE_geelm1_male_t$table_body$variable = bmi2_rGE_geelm1_male_t$table_body$variable = "exposure"
+
+bmi_geerGE_merge_male_t <-
+  tbl_merge(
+    tbls = list(bmi1_rGE_geelm1_male_t, bmi2_rGE_geelm1_male_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+
+# Test of sex difference
+bmi1_rGE_sex_geelm <- geeglm(formula = pred_auto_bmi ~ anywk_new2*male + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+tbl_regression(bmi1_rGE_sex_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2:male") %>% add_n(location = "label")%>% modify_caption("Test of sex difference: rGE with LDpred2 PRS") 
+
+bmi2_rGE_sex_geelm <- geeglm(formula = bmi_score ~ anywk_new2*male + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+tbl_regression(bmi2_rGE_sex_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2:male") %>% add_n(location = "label")%>% modify_caption("Test of sex difference: rGE with PRSice2 PRS") 
+
+
+#Sib
+bmi1_rGE_fe0 <- plm(pred_auto_bmi ~ anywk_new2 + agelab +  agelabsq, data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+
+bmi1_rGE_fe0_t = tbl_regression(bmi1_rGE_fe0, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "anywk_new2", label = anywk_new2 ~ "Famine exposed") %>% add_n(location = "label")
+
+bmi2_rGE_fe0 <- plm(bmi_score ~ anywk_new2 + agelab +  agelabsq, data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+
+bmi2_rGE_fe0_t = tbl_regression(bmi2_rGE_fe0, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "anywk_new2", label = anywk_new2 ~ "Famine exposed") 
+
+bmi1_rGE_fe0_t$table_body$variable = bmi2_rGE_fe0_t$table_body$variable = "exposure"
+
+bmi_ferGE_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_rGE_fe0_t, bmi2_rGE_fe0_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+## Exposed vs Time controls
+bmi1_between_geelm1 <- glm(formula = pred_auto_bmi ~ anywk_new2 + sex,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+#summary(bmi1_b_geelm1)
+bmi1_between_geelm1_t = tbl_regression(bmi1_between_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "anywk_new2", label = anywk_new2 ~ "Famine exposed") %>% add_n(location = "label")
+
+##1. PRS difference by famine exposure: PRS ~ Famine
+bmi2_between_geelm1 <- glm(formula = bmi_score ~ anywk_new2 + sex,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+#summary(bmi1_b_geelm1)
+bmi2_between_geelm1_t = tbl_regression(bmi2_between_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "anywk_new2", label = anywk_new2 ~ "Famine exposed")
+
+bmi1_between_geelm1_t$table_body$variable = bmi2_between_geelm1_t$table_body$variable = "exposure"
+
+bmi_geerGE_between_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_between_geelm1_t, bmi2_between_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+
+bmi_rGE_table2 <-tbl_stack(tbls = list(bmi_geerGE_merge_t, bmi_ferGE_merge_t,bmi_geerGE_between_merge_t),
+                        group_header = c("Primary analysis",
+                                         "Sibling Difference",
+                                         "Exposed vs. Time controls")) %>% 
+              as_gt() %>%
+              gt::tab_style(
+                style = gt::cell_text(weight = "bold"),
+                locations = gt::cells_row_groups(groups = everything())
+              ) %>%
+              gt::tab_header(title = "rGE: PRS ~ Famine")
+
+bmi_rGE_table2
+```
+
+
+#### Table S5/S7/S14/S16.Panel B: rGE adjusted by preconceptual exposure groups (D-1 and D0)      
+S5/7 for main analysis with LDpred and PRSice PGIs, respectively.               
+S14/16 for sex-stratified analysis with LDpred and PRSice PGIs, respectively.   
+```{r}
+#Full
+bmi1_rGE_geelm1 <- geeglm(formula = pred_auto_bmi ~ anywk_new2 + sex + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi1_rGE_geelm1_t = tbl_regression(bmi1_rGE_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2", label = anywk_new2 ~ "Famine exposed") %>% add_n(location = "label")
+
+bmi2_rGE_geelm1 <- geeglm(formula = bmi_score ~ anywk_new2 + sex + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi2_rGE_geelm1_t = tbl_regression(bmi2_rGE_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2", label = anywk_new2 ~ "Famine exposed")
+
+bmi1_rGE_geelm1_t$table_body$variable = bmi2_rGE_geelm1_t$table_body$variable = "exposure"
+
+bmi_geerGE_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_rGE_geelm1_t, bmi2_rGE_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+#bmimaineffect_full = tidy(bmi1_rGE_geelm1) %>% 
+#  cbind(as_tibble(confint.lm(bmi1_rGE_geelm1))) %>% 
+#  filter(term == "anywk_new2") %>% 
+#  mutate(across('term', str_replace, 'anywk_new2', 'BMI rGE Full'))
+
+#Sex-full
+bmi1_rGE_geelm1_female <- geeglm(formula = pred_auto_bmi ~ anywk_new2 + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi1_rGE_geelm1_female_t = tbl_regression(bmi1_rGE_geelm1_female,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2", label = anywk_new2 ~ "Famine exposed") %>% add_n(location = "label")
+
+bmi2_rGE_geelm1_female <- geeglm(formula = bmi_score ~ anywk_new2 + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi2_rGE_geelm1_female_t = tbl_regression(bmi2_rGE_geelm1_female,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2", label = anywk_new2 ~ "Famine exposed") 
+
+bmi1_rGE_geelm1_female_t$table_body$variable = bmi2_rGE_geelm1_female_t$table_body$variable = "exposure"
+
+bmi_geerGE_merge_female_t <-
+  tbl_merge(
+    tbls = list(bmi1_rGE_geelm1_female_t, bmi2_rGE_geelm1_female_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+bmi1_rGE_geelm1_male <- geeglm(formula = pred_auto_bmi ~ anywk_new2 + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi1_rGE_geelm1_male_t = tbl_regression(bmi1_rGE_geelm1_male,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2", label = anywk_new2 ~ "Famine exposed") %>% add_n(location = "label")
+
+bmi2_rGE_geelm1_male <- geeglm(formula = bmi_score ~ anywk_new2 + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+bmi2_rGE_geelm1_male_t = tbl_regression(bmi2_rGE_geelm1_male,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include ="anywk_new2", label = anywk_new2 ~ "Famine exposed")
+
+bmi1_rGE_geelm1_male_t$table_body$variable = bmi2_rGE_geelm1_male_t$table_body$variable = "exposure"
+
+bmi_geerGE_merge_male_t <-
+  tbl_merge(
+    tbls = list(bmi1_rGE_geelm1_male_t, bmi2_rGE_geelm1_male_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+
+
+#Sib
+bmi1_rGE_fe0 <- plm(pred_auto_bmi ~ anywk_new2 + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2, data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+
+bmi1_rGE_fe0_t = tbl_regression(bmi1_rGE_fe0, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "anywk_new2", label = anywk_new2 ~ "Famine exposed") %>% add_n(location = "label")
+
+bmi2_rGE_fe0 <- plm(bmi_score ~ anywk_new2 + agelab +  agelabsq + dwk_neg1vsall_new2 + dwk0vsall_new2, data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+
+bmi2_rGE_fe0_t = tbl_regression(bmi2_rGE_fe0, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "anywk_new2", label = anywk_new2 ~ "Famine exposed")
+
+bmi1_rGE_fe0_t$table_body$variable = bmi2_rGE_fe0_t$table_body$variable = "exposure"
+
+bmi_ferGE_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_rGE_fe0_t, bmi2_rGE_fe0_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+#bmimaineffect_sib = tidy(bmi1_rGE_fe0) %>% 
+#  cbind(as_tibble(confint.lm(bmi1_rGE_fe0))) %>% 
+#  filter(term == "anywk_new2") %>% 
+##  mutate(across('term', str_replace, 'anywk_new2', 'BMI rGE Sib'))
+
+## Exposed vs Time controls
+bmi1_between_geelm1 <- glm(formula = pred_auto_bmi ~ anywk_new2 + sex + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+#summary(bmi1_b_geelm1)
+bmi1_between_geelm1_t = tbl_regression(bmi1_between_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "anywk_new2", label = anywk_new2 ~ "Famine exposed") %>% add_n(location = "label")
+
+##1. PRS difference by famine exposure: PRS ~ Famine
+bmi2_between_geelm1 <- glm(formula = bmi_score ~ anywk_new2 + sex + dwk_neg1vsall_new2 + dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+#summary(bmi1_b_geelm1)
+bmi2_between_geelm1_t = tbl_regression(bmi2_between_geelm1, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include = "anywk_new2", label = anywk_new2 ~ "Famine exposed")
+
+bmi1_between_geelm1_t$table_body$variable = bmi2_between_geelm1_t$table_body$variable = "exposure"
+
+bmi_geerGE_between_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_between_geelm1_t, bmi2_between_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+
+
+
+bmi_rGE_table <-tbl_stack(tbls = list(bmi_geerGE_merge_t,bmi_geerGE_merge_female_t,bmi_geerGE_merge_male_t, bmi_ferGE_merge_t,bmi_geerGE_between_merge_t),
+                        group_header = c("Primary analysis",
+                                         "Primary analysis (female)",
+                                         "Primary analysis Cohort (male)",
+                                         "Sibling Difference",
+                                         "Exposed vs. Time controls")) %>% 
+              as_gt() %>%
+              gt::tab_style(
+                style = gt::cell_text(weight = "bold"),
+                locations = gt::cells_row_groups(groups = everything())
+              ) %>%
+              gt::tab_header(title = "rGE: PRS ~ Famine")
+
+bmi_rGE_table
+```
+
+
+
+## Gene-environmnent interaction (GxE)
+
+#### Table S4/S6/S13/S15 Panel C: GxE
+S4/13 for main analysis with LDpred and PRSice PGIs, respectively.               
+S6/15 for sex-stratified analysis with LDpred and PRSice PGIs, respectively. 
+```{r}
+bmi1_GxE_geelm1 <- geeglm(formula = bmi~ pred_auto_bmi*anywk_new2 + sex + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+
+bmi1_GxE_geelm1_t = tbl_regression(bmi1_GxE_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("pred_auto_bmi","anywk_new2", "pred_auto_bmi:anywk_new2"), label = list(pred_auto_bmi~"BMI PRS",anywk_new2 ~ "Famine exposed"))%>% add_n(location = "label")
+
+bmi2_GxE_geelm1 <- geeglm(formula = bmi~ bmi_score*anywk_new2 + sex + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi2_GxE_geelm1_t = tbl_regression(bmi2_GxE_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("bmi_score","anywk_new2", "bmi_score:anywk_new2"), label = list(bmi_score~"BMI PRS", anywk_new2 ~ "Famine exposed"))
+
+bmi1_GxE_geelm1_t$table_body$variable = bmi2_GxE_geelm1_t$table_body$variable = c("prs","exposure","interaction")
+
+bmi_geeGxE_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_GxE_geelm1_t, bmi2_GxE_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+#Sex-full
+bmi1_GxE_geelm1_female <- geeglm(formula = bmi~ pred_auto_bmi*anywk_new2 + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi1_GxE_geelm1_female_t = tbl_regression(bmi1_GxE_geelm1_female,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("pred_auto_bmi","anywk_new2", "pred_auto_bmi:anywk_new2"), label = list(pred_auto_bmi~"BMI PRS",anywk_new2 ~ "Famine exposed")) %>% add_n(location = "label")
+
+bmi2_GxE_geelm1_female <- geeglm(formula = bmi~ bmi_score*anywk_new2 + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi2_GxE_geelm1_female_t = tbl_regression(bmi2_GxE_geelm1_female,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("bmi_score","anywk_new2", "bmi_score:anywk_new2"), label = list(bmi_score~"BMI PRS", anywk_new2 ~ "Famine exposed"))
+
+bmi1_GxE_geelm1_female_t$table_body$variable = bmi2_GxE_geelm1_female_t$table_body$variable = c("prs","exposure","interaction")
+
+bmi_geeGxE_merge_female_t <-
+  tbl_merge(
+    tbls = list(bmi1_GxE_geelm1_female_t, bmi2_GxE_geelm1_female_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+bmi1_GxE_geelm1_male <- geeglm(formula = bmi~ pred_auto_bmi*anywk_new2 + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi1_GxE_geelm1_male_t = tbl_regression(bmi1_GxE_geelm1_male,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("pred_auto_bmi","anywk_new2", "pred_auto_bmi:anywk_new2"), label = list(pred_auto_bmi~"BMI PRS",anywk_new2 ~ "Famine exposed")) %>% add_n(location = "label")
+
+bmi2_GxE_geelm1_male <- geeglm(formula = bmi~ bmi_score*anywk_new2 + agelab + agelabsq,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi2_GxE_geelm1_male_t = tbl_regression(bmi2_GxE_geelm1_male,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("bmi_score","anywk_new2", "bmi_score:anywk_new2"), label = list(bmi_score~"BMI PRS", anywk_new2 ~ "Famine exposed"))
+
+bmi1_GxE_geelm1_male_t$table_body$variable = bmi2_GxE_geelm1_male_t$table_body$variable = c("prs","exposure","interaction")
+
+bmi_geeGxE_merge_male_t <-
+  tbl_merge(
+    tbls = list(bmi1_GxE_geelm1_male_t, bmi2_GxE_geelm1_male_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+# Test of Sex difference
+bmi1_GxE_sex_geelm <- geeglm(formula = bmi ~ anywk_new2*male + pred_auto_bmi*male + anywk_new2*pred_auto_bmi*male+ agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+tbl_regression(bmi1_GxE_sex_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("anywk_new2:male", "male:pred_auto_bmi", "anywk_new2:male:pred_auto_bmi")) %>% add_n(location = "label") %>% modify_caption("Test of sex difference: GxE with LDpred2 PRS")
+
+bmi2_GxE_sex_geelm <- geeglm(formula = bmi ~ anywk_new2*male + bmi_score*male + anywk_new2*bmi_score*male+ agelab + agelabsq,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+tbl_regression(bmi2_GxE_sex_geelm,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("anywk_new2:male", "male:bmi_score", "anywk_new2:male:bmi_score")) %>% add_n(location = "label") %>% modify_caption("Test of sex difference: GxE with PRSice2 PRS")
+
+
+# Sib
+bmi1_GxE_fe0 <- plm(bmi~pred_auto_bmi*anywk_new2 + agelab + agelabsq, data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+
+bmi1_GxE_fe0_t = tbl_regression(bmi1_GxE_fe0, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("pred_auto_bmi","anywk_new2", "pred_auto_bmi:anywk_new2"),label = list(pred_auto_bmi~"BMI PRS", anywk_new2 ~ "Famine exposed")) %>% add_n(location = "label")
+
+bmi2_GxE_fe0 <- plm(bmi~bmi_score*anywk_new2 + agelab + agelabsq, data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+
+bmi2_GxE_fe0_t = tbl_regression(bmi2_GxE_fe0, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("bmi_score","anywk_new2", "bmi_score:anywk_new2"),label = list(bmi_score~"BMI PRS", anywk_new2 ~ "Famine exposed"))
+
+bmi1_GxE_fe0_t$table_body$variable = bmi2_GxE_fe0_t$table_body$variable = c("prs","exposure","interaction")
+
+bmi_feGxE_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_GxE_fe0_t, bmi2_GxE_fe0_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+
+# Exposed vs. Time
+bmi1_GxE_between_geelm1 <- glm(formula = bmi~ pred_auto_bmi*anywk_new2 + sex,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+
+bmi1_GxE_between_geelm1_t = tbl_regression(bmi1_GxE_between_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("pred_auto_bmi","anywk_new2", "pred_auto_bmi:anywk_new2"), label = list(pred_auto_bmi~"BMI PRS",anywk_new2 ~ "Famine exposed"))%>% add_n(location = "label")
+
+bmi2_GxE_between_geelm1 <- glm(formula = bmi~ bmi_score*anywk_new2 + sex,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+bmi2_GxE_between_geelm1_t = tbl_regression(bmi2_GxE_between_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("bmi_score","anywk_new2", "bmi_score:anywk_new2"), label = list(bmi_score~"BMI PRS", anywk_new2 ~ "Famine exposed"))
+
+bmi1_GxE_between_geelm1_t$table_body$variable = bmi2_GxE_between_geelm1_t$table_body$variable = c("prs","exposure","interaction")
+
+bmi_geeGxE_between_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_GxE_between_geelm1_t, bmi2_GxE_between_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+
+bmi_GxE_table2 <-tbl_stack(tbls = list(bmi_geeGxE_merge_t, bmi_feGxE_merge_t,bmi_geeGxE_between_merge_t),
+                        group_header = c("Primary analysis",
+                                         "Sibling Difference",
+                                         "Exposed vs. Time control")) %>%
+              as_gt() %>%
+              gt::tab_style(
+                style = gt::cell_text(weight = "bold"),
+                locations = gt::cells_row_groups(groups = everything())
+              ) %>%
+              gt::tab_header(title = "GxE: BMI ~ Famine*PRS")
+
+bmi_GxE_table2
+```
+
+#### Table S5/S7/S14/S16.Panel C: GxE adjusted by preconceptual exposure groups (D-1 and D0)      
+S5/7 for main analysis with LDpred and PRSice PGIs, respectively.               
+S14/16 for sex-stratified analysis with LDpred and PRSice PGIs, respectively. 
+```{r}
+bmi1_GxE_geelm1 <- geeglm(formula = bmi~ pred_auto_bmi*anywk_new2 + sex + agelab + agelabsq + pred_auto_bmi*dwk_neg1vsall_new2 + pred_auto_bmi*dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+
+bmi1_GxE_geelm1_t = tbl_regression(bmi1_GxE_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("pred_auto_bmi","anywk_new2", "pred_auto_bmi:anywk_new2"), label = list(pred_auto_bmi~"BMI PRS",anywk_new2 ~ "Famine exposed"))%>% add_n(location = "label")
+
+bmi2_GxE_geelm1 <- geeglm(formula = bmi~ bmi_score*anywk_new2 + sex + agelab +agelabsq + bmi_score*dwk_neg1vsall_new2 + bmi_score*dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi2_GxE_geelm1_t = tbl_regression(bmi2_GxE_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("bmi_score","anywk_new2", "bmi_score:anywk_new2"), label = list(bmi_score~"BMI PRS", anywk_new2 ~ "Famine exposed"))
+
+bmi1_GxE_geelm1_t$table_body$variable = bmi2_GxE_geelm1_t$table_body$variable = c("prs","exposure","interaction")
+
+bmi_geeGxE_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_GxE_geelm1_t, bmi2_GxE_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+#Sex-full
+bmi1_GxE_geelm1_female <- geeglm(formula = bmi~ pred_auto_bmi*anywk_new2 + agelab +  agelabsq + pred_auto_bmi*dwk_neg1vsall_new2 + pred_auto_bmi*dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi1_GxE_geelm1_female_t = tbl_regression(bmi1_GxE_geelm1_female,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("pred_auto_bmi","anywk_new2", "pred_auto_bmi:anywk_new2"), label = list(pred_auto_bmi~"BMI PRS",anywk_new2 ~ "Famine exposed")) %>% add_n(location = "label")
+
+bmi2_GxE_geelm1_female <- geeglm(formula = bmi~ bmi_score*anywk_new2 + agelab +  agelabsq + bmi_score*dwk_neg1vsall_new2 + bmi_score*dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_female,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi2_GxE_geelm1_female_t = tbl_regression(bmi2_GxE_geelm1_female,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("bmi_score","anywk_new2", "bmi_score:anywk_new2"), label = list(bmi_score~"BMI PRS", anywk_new2 ~ "Famine exposed"))
+
+bmi1_GxE_geelm1_female_t$table_body$variable = bmi2_GxE_geelm1_female_t$table_body$variable = c("prs","exposure","interaction")
+
+bmi_geeGxE_merge_female_t <-
+  tbl_merge(
+    tbls = list(bmi1_GxE_geelm1_female_t, bmi2_GxE_geelm1_female_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+bmi1_GxE_geelm1_male <- geeglm(formula = bmi~ pred_auto_bmi*anywk_new2 + agelab +  agelabsq + pred_auto_bmi*dwk_neg1vsall_new2 + pred_auto_bmi*dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi1_GxE_geelm1_male_t = tbl_regression(bmi1_GxE_geelm1_male,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("pred_auto_bmi","anywk_new2", "pred_auto_bmi:anywk_new2"), label = list(pred_auto_bmi~"BMI PRS",anywk_new2 ~ "Famine exposed")) %>% add_n(location = "label")
+
+bmi2_GxE_geelm1_male <- geeglm(formula = bmi~ bmi_score*anywk_new2 + agelab +  agelabsq + bmi_score*dwk_neg1vsall_new2 + bmi_score*dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_male,
+                      family  = gaussian(link = "identity"),
+                      id = idfam,
+                      corstr  = "exchangeable")
+
+bmi2_GxE_geelm1_male_t = tbl_regression(bmi2_GxE_geelm1_male,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("bmi_score","anywk_new2", "bmi_score:anywk_new2"), label = list(bmi_score~"BMI PRS", anywk_new2 ~ "Famine exposed"))
+
+bmi1_GxE_geelm1_male_t$table_body$variable = bmi2_GxE_geelm1_male_t$table_body$variable = c("prs","exposure","interaction")
+
+bmi_geeGxE_merge_male_t <-
+  tbl_merge(
+    tbls = list(bmi1_GxE_geelm1_male_t, bmi2_GxE_geelm1_male_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+
+
+
+# SIb
+bmi1_GxE_fe0 <- plm(bmi~pred_auto_bmi*anywk_new2 + agelab +  agelabsq + pred_auto_bmi*dwk_neg1vsall_new2 + pred_auto_bmi*dwk0vsall_new2, data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+
+bmi1_GxE_fe0_t = tbl_regression(bmi1_GxE_fe0, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("pred_auto_bmi","anywk_new2", "pred_auto_bmi:anywk_new2"),label = list(pred_auto_bmi~"BMI PRS", anywk_new2 ~ "Famine exposed")) %>% add_n(location = "label")
+
+bmi2_GxE_fe0 <- plm(bmi~bmi_score*anywk_new2+ agelab +  agelabsq + bmi_score*dwk_neg1vsall_new2 + bmi_score*dwk0vsall_new2, data = DHWFS_merged_data_prs_sib,
+                    index = c("idfam"), 
+                    model = "within", 
+                    effect = "individual")
+
+bmi2_GxE_fe0_t = tbl_regression(bmi2_GxE_fe0, estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("bmi_score","anywk_new2", "bmi_score:anywk_new2"),label = list(bmi_score~"BMI PRS", anywk_new2 ~ "Famine exposed"))
+
+bmi1_GxE_fe0_t$table_body$variable = bmi2_GxE_fe0_t$table_body$variable = c("prs","exposure","interaction")
+
+bmi_feGxE_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_GxE_fe0_t, bmi2_GxE_fe0_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+
+# Exposed vs. Time
+bmi1_GxE_between_geelm1 <- glm(formula = bmi~ pred_auto_bmi*anywk_new2 + sex + pred_auto_bmi*dwk_neg1vsall_new2 + pred_auto_bmi*dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+
+bmi1_GxE_between_geelm1_t = tbl_regression(bmi1_GxE_between_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("pred_auto_bmi","anywk_new2", "pred_auto_bmi:anywk_new2"), label = list(pred_auto_bmi~"BMI PRS",anywk_new2 ~ "Famine exposed"))%>% add_n(location = "label")
+
+bmi2_GxE_between_geelm1 <- glm(formula = bmi~ bmi_score*anywk_new2 + sex +  bmi_score*dwk_neg1vsall_new2 + bmi_score*dwk0vsall_new2,
+                      data = DHWFS_merged_data_prs_time,
+                      family  = gaussian(link = "identity"))
+
+bmi2_GxE_between_geelm1_t = tbl_regression(bmi2_GxE_between_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3), include =c("bmi_score","anywk_new2", "bmi_score:anywk_new2"), label = list(bmi_score~"BMI PRS", anywk_new2 ~ "Famine exposed"))
+
+bmi1_GxE_between_geelm1_t$table_body$variable = bmi2_GxE_between_geelm1_t$table_body$variable = c("prs","exposure","interaction")
+
+bmi_geeGxE_between_merge_t <-
+  tbl_merge(
+    tbls = list(bmi1_GxE_between_geelm1_t, bmi2_GxE_between_geelm1_t),
+    tab_spanner = c("**LDpred2: Auto model**", "**PRSice2: p=1,r2=1**")
+  )
+
+
+
+
+
+bmi_GxE_table <-tbl_stack(tbls = list(bmi_geeGxE_merge_t,bmi_geeGxE_merge_female_t,bmi_geeGxE_merge_male_t, bmi_feGxE_merge_t,bmi_geeGxE_between_merge_t),
+                        group_header = c("Primary analysis",
+                                         "Primary analysis (female)",
+                                         "Primary analysis (male)",
+                                         "Sibling Difference",
+                                         "Exposed vs. Time control")) %>%
+              as_gt() %>%
+              gt::tab_style(
+                style = gt::cell_text(weight = "bold"),
+                locations = gt::cells_row_groups(groups = everything())
+              ) %>%
+              gt::tab_header(title = "GxE: BMI ~ Famine*PRS")
+
+bmi_GxE_table
+```
+
+
+
+## Figure 4: Correlations between BMI and BMI PRS
+```{r}
+# New facet label names for supp variable
+DHWFS_merged_data_prs_scatter = DHWFS_merged_data_prs %>% 
+  mutate(type = fct_relevel(type, c("exposed","time control","sib control")))
+
+supp.labs <- c('Famine-exposed','Time Controls', 'Sibling Controls')
+names(supp.labs) <- c("exposed","time control", "sib control")
+
+scatter_p = ggplot(DHWFS_merged_data_prs_scatter, aes(pred_auto_bmi, bmi_raw, color = type))+
+  geom_point()+
+  geom_smooth(method=lm,aes(fill = type))
+scatter_p + facet_wrap(~type,labeller = labeller(type = supp.labs))+
+  scale_color_manual(values = c( "#FE9F6DFF", "#8C2981FF", "#3B0F70FF"), labels=c('Famine-exposed','Time Controls', 'Sibling Controls'))+
+  scale_fill_manual(values = c( "#FE9F6DFF", "#8C2981FF", "#3B0F70FF"))+
+    labs(
+    x = "BMI PGI",
+    y = "BMI",
+    color = "Exposure Group"
+  )+
+  geom_vline(xintercept=0, linetype="dashed", color = "black")+
+  theme_minimal()+
+  guides(fill="none", shape = "none")+
+  theme(aspect.ratio = 1,text = element_text(size = 20), legend.position = 'none')
+```
+
+
+
+## Dwk Sensitivity Analysis:
+Sensitivity analysis on the timing-specific gene-environment correlations and interaction betweens in-utero famine exposure and LDpred2 produced body mass index (BMI) polygenic index (PGI).
+
+
+##### Table S8: Sensitivity analysis on the timing-specific gene-environment correlation between in-utero famine exposure and LDpred2 produced body mass index (BMI)
+```{r}
+bmi1_rGE_dwk_geelm1_bmi <- geeglm(formula = pred_auto_bmi ~ dwk_neg1vsall_new2 + dwk0vsall_new2 + dwk1vsall_new2 + dwk2vsall_new2 + dwk3vsall_new2 + dwk4vsall_new2 + sex+ agelab +agelabsq,
+                    data = DHWFS_merged_data_prs,
+                    family = gaussian(link = "identity"),
+                    id = idfam,
+                    corstr = "exchangeable")
+
+tbl_regression(bmi1_rGE_dwk_geelm1_bmi,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3)) %>% add_n(location = "label")
+```
+
+
+##### Figure S1: Sensitivity analysis on the timing-specific gene-environment correlation between in-utero famine exposure and LDpred2 produced body mass index (BMI) polygenic index (PGI).
+```{r}
+bmi1_rGE_dwk_gee = tidy(bmi1_rGE_dwk_geelm1_bmi) %>% 
+  cbind(as_tibble(confint.lm(bmi1_rGE_dwk_geelm1_bmi))) %>% 
+  filter(term == "dwk_neg1vsall_new2" | term == "dwk0vsall_new2" | term == "dwk1vsall_new2" | term == "dwk2vsall_new2" | term == "dwk3vsall_new2" | term == "dwk4vsall_new2")
+bmi1_rGE_dwk_gee$name <- c("Full Sample", "Full Sample", "Full Sample", "Full Sample", "Full Sample", "Full Sample") %>%
+        as.factor()
+bmi1_rGE_dwk_gee$dwk <- c("dwk-1", "dwk0", "dwk1", "dwk2", "dwk3", "dwk4")
+bmi1_rGE_dwk_gee$exposure <- factor(bmi1_rGE_dwk_gee$dwk,
+levels = c("dwk4", "dwk3", "dwk2", "dwk1", "dwk0", "dwk-1"),
+labels =c("weeks 31-to delivery","gestational weeks 21-30","gestational weeks 11-20","gestational weeks 1-10","conception to less than 10 weeks","preconceptional"))
+
+bmi1_rGE_dwk = bmi1_rGE_dwk_gee #%>% rbind(bmi1_rGE_dwk_plm)
+
+bmi1_dwk_rGEplot<- ggplot(data=bmi1_rGE_dwk, aes(exposure, estimate, group = 1)) +
+  geom_line()+
+  geom_point() +
+  geom_errorbar(aes(ymin = `2.5 %`, ymax = `97.5 %`), size= 0.3, width = 0.3)+
+    labs(
+    x = "Timing of Famine Exposure",
+    y = "Effect Size",
+    title = "LDpred2 auto BMI PRS") +
+  geom_line(size= 1, alpha = 1) +
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+bmi1_dwk_rGEplot
+```
+
+
+##### Table S17: Sensitivity analysis on the timing-specific gene-environment correlation between in-utero famine exposure and PRSice2 produced body mass index (BMI)
+```{r}
+bmi2_rGE_dwk_geelm1_bmi <- geeglm(formula = bmi_score ~ dwk_neg1vsall_new2 + dwk0vsall_new2 + dwk1vsall_new2 + dwk2vsall_new2 + dwk3vsall_new2 + dwk4vsall_new2 + sex+ agelab +agelabsq,
+                    data = DHWFS_merged_data_prs,
+                    family = gaussian(link = "identity"),
+                    id = idfam,
+                    corstr = "exchangeable")
+
+tbl_regression(bmi2_rGE_dwk_geelm1_bmi,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3)) %>% add_n(location = "label")
+```
+
+
+##### Figure S3: Sensitivity analysis on the timing-specific gene-environment correlation between in-utero famine exposure and PRSice2 produced body mass index (BMI) polygenic index (PGI).
+```{r}
+bmi2_rGE_dwk_gee = tidy(bmi2_rGE_dwk_geelm1_bmi) %>% 
+  cbind(as_tibble(confint.lm(bmi2_rGE_dwk_geelm1_bmi))) %>% 
+  filter(term == "dwk_neg1vsall_new2" | term == "dwk0vsall_new2" | term == "dwk1vsall_new2" | term == "dwk2vsall_new2" | term == "dwk3vsall_new2" | term == "dwk4vsall_new2")
+bmi2_rGE_dwk_gee$name <- c("Full Sample", "Full Sample", "Full Sample", "Full Sample", "Full Sample", "Full Sample") %>%
+        as.factor()
+bmi2_rGE_dwk_gee$dwk <- c("dwk-1", "dwk0", "dwk1", "dwk2", "dwk3", "dwk4")
+bmi2_rGE_dwk_gee$exposure <- factor(bmi2_rGE_dwk_gee$dwk,
+levels = c("dwk4", "dwk3", "dwk2", "dwk1", "dwk0", "dwk-1"),
+labels =c("weeks 31-to delivery","gestational weeks 21-30","gestational weeks 11-20","gestational weeks 1-10","conception to less than 10 weeks","preconceptional"))
+
+bmi2_rGE_dwk = bmi2_rGE_dwk_gee #%>% rbind(bmi1_rGE_dwk_plm)
+
+bmi2_dwk_rGEplot<- ggplot(data=bmi2_rGE_dwk, aes(exposure, estimate, group = 1)) +
+  geom_line()+
+  geom_point() +
+  geom_errorbar(aes(ymin = `2.5 %`, ymax = `97.5 %`), size= 0.3, width = 0.3)+
+    labs(
+    x = "Timing of Famine Exposure",
+    y = "Effect Size",
+    title = "PRSice2 BMI PRS") +
+  geom_line(size= 1, alpha = 1) +
+  geom_hline(yintercept=0, linetype="dashed", color = "black")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+bmi2_dwk_rGEplot
+```
+
+
+#### Table S9. Sensitivity analysis on the timing-specific gene-environment interaction between in-utero famine exposure and LDpred2 produced body mass index (BMI) polygenic index (PGI).
+```{r}
+bmi1_GxE_dwk_geelm1 <- geeglm(formula = bmi ~ dwk_neg1vsall_new2/pred_auto_bmi + dwk0vsall_new2/pred_auto_bmi+ dwk1vsall_new2/pred_auto_bmi + dwk2vsall_new2/pred_auto_bmi + dwk3vsall_new2/pred_auto_bmi + dwk4vsall_new2/pred_auto_bmi + sex+ agelab +agelabsq,
+                    data = DHWFS_merged_data_prs,
+                    family = gaussian(link = "identity"),
+                    id = idfam,
+                    corstr = "exchangeable")
+
+summary(bmi1_GxE_dwk_geelm1)
+
+tbl_regression(bmi1_GxE_dwk_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3))
+```
+
+#### Figure S2: Sensitivity analysis on the timing-specific gene-environment interaction between in-utero famine exposure and LDpred2 produced body mass index (BMI) polygenic index (PGI).
+```{r}
+bmi1_GxE_dwk_gee = tidy(bmi1_GxE_dwk_geelm1) %>% 
+  cbind(as_tibble(confint.lm(bmi1_GxE_dwk_geelm1))) %>% 
+  filter(term == "dwk_neg1vsall_new2:pred_auto_bmi" | term == "pred_auto_bmi:dwk0vsall_new2" | term == "pred_auto_bmi:dwk1vsall_new2" | term == "pred_auto_bmi:dwk2vsall_new2" | term == "pred_auto_bmi:dwk3vsall_new2" | term == "pred_auto_bmi:dwk4vsall_new2")
+bmi1_GxE_dwk_gee$dwk <- c("dwk-1", "dwk0", "dwk1", "dwk2", "dwk3", "dwk4")
+bmi1_GxE_dwk_gee$exposure <- factor(bmi1_GxE_dwk_gee$dwk,
+levels = c("dwk4", "dwk3", "dwk2", "dwk1", "dwk0", "dwk-1"),
+labels =c("weeks 31-to delivery","gestational weeks 21-30","gestational weeks 11-20","gestational weeks 1-10","conception to less than 10 weeks","preconceptional"))
+
+bmi1_dwk_GxEplot<- ggplot(data=bmi1_GxE_dwk_gee, aes(exposure, estimate, group = 1)) +
+  geom_line()+
+  geom_point() +
+  geom_errorbar(aes(ymin = `2.5 %`, ymax = `97.5 %`), size= 0.3, width = 0.3)+
+    labs(
+    x = "Timing of Famine Exposure",
+    y = "Genetic Effect in the Famine Exposed Group",
+    title = "Dwk GxE: LDpred2 BMI PRS") +
+  geom_line(size= 1, alpha = 1) +
+  geom_hline(aes(yintercept = 0.42), color = "gray") +
+  geom_text(aes(0,0.42, label = "ME of BMI PRS", vjust = -0.5, hjust = -0.05), color = "gray",size = 3)+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+bmi1_dwk_GxEplot
+```
+
+
+#### Table S18. Sensitivity analysis on the timing-specific gene-environment interaction between in-utero famine exposure and PRSice2 produced body mass index (BMI) polygenic index (PGI).
+```{r}
+bmi2_GxE_dwk_geelm1 <- geeglm(formula = bmi ~ dwk_neg1vsall_new2/bmi_score + dwk0vsall_new2/bmi_score+ dwk1vsall_new2/bmi_score + dwk2vsall_new2/bmi_score + dwk3vsall_new2/bmi_score + dwk4vsall_new2/bmi_score + sex+ agelab +agelabsq,
+                    data = DHWFS_merged_data_prs,
+                    family = gaussian(link = "identity"),
+                    id = idfam,
+                    corstr = "exchangeable")
+
+summary(bmi2_GxE_dwk_geelm1)
+
+tbl_regression(bmi2_GxE_dwk_geelm1,estimate_fun = function(x)style_ratio(x, digits = 2),pvalue_fun = function(x) style_pvalue(x, digits = 3))
+```
+
+
+#### Figure S4: Sensitivity analysis on the timing-specific gene-environment interaction between in-utero famine exposure and PRSice2 produced body mass index (BMI) polygenic index (PGI).
+```{r}
+bmi2_GxE_dwk_gee = tidy(bmi2_GxE_dwk_geelm1) %>% 
+  cbind(as_tibble(confint.lm(bmi2_GxE_dwk_geelm1))) %>% 
+  filter(term == "dwk_neg1vsall_new2:bmi_score" | term == "bmi_score:dwk0vsall_new2" | term == "bmi_score:dwk1vsall_new2" | term == "bmi_score:dwk2vsall_new2" | term == "bmi_score:dwk3vsall_new2" | term == "bmi_score:dwk4vsall_new2")
+bmi2_GxE_dwk_gee$dwk <- c("dwk-1", "dwk0", "dwk1", "dwk2", "dwk3", "dwk4")
+bmi2_GxE_dwk_gee$exposure <- factor(bmi2_GxE_dwk_gee$dwk,
+levels = c("dwk4", "dwk3", "dwk2", "dwk1", "dwk0", "dwk-1"),
+labels =c("weeks 31-to delivery","gestational weeks 21-30","gestational weeks 11-20","gestational weeks 1-10","conception to less than 10 weeks","preconceptional"))
+
+bmi2_dwk_GxEplot<- ggplot(data=bmi2_GxE_dwk_gee, aes(exposure, estimate, group = 1)) +
+  geom_line()+
+  geom_point() +
+  geom_errorbar(aes(ymin = `2.5 %`, ymax = `97.5 %`), size= 0.3, width = 0.3)+
+    labs(
+    x = "Timing of Famine Exposure",
+    y = "Genetic Effect in the Famine Exposed Group",
+    title = "Dwk GxE: PRSice2 BMI PRS") +
+  geom_line(size= 1, alpha = 1) +
+  geom_hline(aes(yintercept = 0.31), color = "gray") +
+  geom_text(aes(0,0.31, label = "ME of BMI PRS", vjust = -0.5, hjust = -0.05), color = "gray",size = 3)+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+bmi2_dwk_GxEplot
+```
