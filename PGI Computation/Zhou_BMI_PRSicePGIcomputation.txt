@@ -1,0 +1,20 @@
+
+## BMI
+Rscript PRSice.R \
+    --prsice PRSice_linux \
+    --base Bmi.giant-ukbb.meta-analysis.combined.23May2018.HapMap2_only.cleaned.txt.gz \
+    --stat BETA\
+    --beta  \
+    --binary-target F \
+    --no-clump \
+    --missing SET_ZERO \
+    --model add \
+    --no-regress \
+    --bar-levels 1 \
+    --fastscore \
+    --target HWFS_imputed \
+    --pheno hwfs.pheno \
+    --lower 0 \
+    --upper 1 \
+    --thread 1 \
+    --out Bmi.giant-ukbb.meta-analysis.combined.23May2018.HapMap2_only_HWFS.IMPUTED_1_1

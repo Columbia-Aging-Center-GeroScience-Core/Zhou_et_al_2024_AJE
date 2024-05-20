@@ -1,0 +1,46 @@
+---
+title: "PRS Residualization"
+author: "Jiayi Zhou(jz3336)"
+date: "9/19/2022"
+output: html_document
+---
+This document contains codes to residualize PGI on to principle components.
+
+*Data sources*
+- PGI
+- PC
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(tidyverse)
+library(R.utils)
+library(qqman)
+library(Amelia)
+library(corrplot)
+library(corrplot)
+library(RColorBrewer)
+library(umx)
+library(ggplot2)
+library(tidyr)
+library(RColorBrewer)
+```
+
+## Residualize and Standardize
+Residualize the PRS on PCs
+```{r}
+pc_10 = c("PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9", "PC10")
+
+r_PGI_prsice2 = umx_residualize("PGI_PRSice", pc_10, data = PRS_merged_data) %>% 
+  select(bmi_score) %>% 
+  scale(center = TRUE, scale = TRUE)
+
+r_PGI_LDpred2 = umx_residualize("PGI_LDpred", pc_10, data = PRS_merged_data) %>% 
+  select(pred_auto_bmi) %>% 
+  scale(center = TRUE, scale = TRUE)
+
+
+std = data.frame(PRS_merged_data$hofnum1,
+                             r_PGI_prsice2, r_PGI_LDpred2)
+```
+
