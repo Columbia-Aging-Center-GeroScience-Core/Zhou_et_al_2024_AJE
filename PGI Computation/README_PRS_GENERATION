@@ -1,0 +1,8 @@
+1.Zhou_LDpredPGIcomputation_AJE.R:
+LDpred2 pipeline for PRS calculation
+
+2. Zhou_BMI_PRSicePGIcomputation.txt:
+commands used for generating PRSice2 PRS for BMI
+
+3. Zhou_PGIresidualization_AJE
+Residualizing PGIs on to principle components
